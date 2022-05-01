@@ -4,19 +4,23 @@
     margin-bottom: 40px;
 }
 
-.content-box {
-    margin-top: 40px;
+#big-box {
     text-align: center;
 }
 
-.result-box, #cancel-box {
+#left-box, #right-box {
+    margin-top: 40px;
     display: inline-block;
     text-align: center;
-    padding: 40px;
+    vertical-align: top;
 }
 
-#cancel-box {
-    vertical-align: top;
+.manage-box {
+    margin-top: 20px;
+}
+
+.result-box {
+    margin-bottom: 50px;
 }
 
 .flight-cell {
@@ -34,7 +38,7 @@
     margin-left: 0px;
 }
 
-.cancel-input {
+.input {
     width: 175px;
     margin-top: 5px;
 }
@@ -44,13 +48,9 @@
     margin-bottom: 50px;
 }
 
-#spending-box {
-    display: inline-block;
-    vertical-align: top;
-    padding: 40px;
-}
-
 #spending-img {
     width: 500px;
     height: 400px;
+    margin-top: -10px;
+    margin-bottom: 20px;
 }

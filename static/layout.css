@@ -1,7 +1,6 @@
 #navbar {
     height: 75px;
     padding: 25px;
-    position: sticky;
     text-align: center;
     transition: 0.15s ease-out;
     background-color: #84cf98;

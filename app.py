@@ -63,20 +63,28 @@ def page_not_found(e):
 @app.route('/', methods=['GET', 'POST'])
 def home():
     name = session['name'] if 'name' in session else None
-    success = session['success'] if 'success' in session else None
-    spend_filter_error = session['spend-filter-error'] if 'spend-filter-error' in session else None
 
     # Check if not logged in
-    if not name:
+    if not name or session['role'] == 'staff':
         return redirect(url_for('login'))
-    if success:
-        session.pop('success')
+
+    cancel_error = session['cancel_error'] if 'cancel_error' in session else None
+    spend_filter_error = session['spend-filter-error'] if 'spend-filter-error' in session else None
+    comment_error = session['comment_error'] if 'comment_error' in session else None
+    comment_success = session['comment_success'] if 'comment_success' in session else None
+
+    if cancel_error:
+        session.pop('cancel_error')
     if spend_filter_error:
         session.pop('spend-filter-error')
+    if comment_error:
+        session.pop('comment_error')
+    if comment_success:
+        session.pop('comment_success')
 
     # Get flight info from purchased tickets
     query = f"""SELECT DISTINCT ticket_id, P.airline, P.flight_id, P.depart_dt,
-                    F.arrival_dt, F.src_airport_code, F.dest_airport_code 
+                    F.arrival_dt, F.src_airport_code, F.dest_airport_code, F.status
                 FROM purchases as P NATURAL JOIN flight as F
                 WHERE c_email='{session['username']}' AND P.depart_dt """
 
@@ -100,13 +108,12 @@ def home():
 
         date_range = {}
         while start <= end:
-            current = f'{MONTHS[start.month]} {start.year}'
-            print(current)
+            current = f'{MONTHS[start.month]} {start.year % 100}'
             date_range[current] = 0
             start += relativedelta(months=1)
 
         for s in spending:
-            current = f'{MONTHS[s[0].month]} {s[1].year}'
+            current = f'{MONTHS[s[0].month]} {s[1].year % 100}'
             date_range[current] = s[2]
 
         create_figure(date_range)
@@ -114,7 +121,8 @@ def home():
     t = session['time']
     session.pop('time')
     return render_template('index.html', name=name, flights=flights, past_flights=past_flights, \
-        success=success, time=str(t), spend_filter_error=spend_filter_error)
+        cancel_error=cancel_error, time=str(t), spend_filter_error=spend_filter_error, \
+        comment_error=comment_error, comment_success=comment_success)
 
 @app.route('/login')
 def login():
@@ -130,6 +138,8 @@ def register():
 
 @app.route('/staffRegister')
 def staff_register():
+    if 'name' in session:
+        return redirect(url_for('home'))
     return render_template('staff_register.html')
 
 @app.route('/loginAuth', methods=['GET', 'POST'])
@@ -337,7 +347,7 @@ def filter():
 
 @app.route('/purchase', methods=['GET', 'POST'])
 def purchase():
-    if 'name' not in session:
+    if 'name' not in session or session['role'] == 'staff':
         return redirect(url_for('search'))
 
     # Get all future flights
@@ -376,27 +386,33 @@ def purchase():
 
 @app.route('/cancel', methods=['POST', 'GET'])
 def cancel():
-    if 'name' not in session:
+    if 'name' not in session or session['role'] == 'staff':
         return redirect(url_for('login'))
 
     ticket_id = request.form['ticket_id']
     airline = request.form['airline']
     flight_id = request.form['flight_id']
     depart_dt = request.form['depart_date'] + ' ' + request.form['depart_time'] + ':00'
+    
+    now = datetime.now()
+    flight_dt = datetime.strptime(depart_dt, '%Y-%m-%d %H:%M:%S')
+
+    if now > flight_dt - relativedelta(days=1):
+        session['cancel_error'] = 'Cannot cancel flight less than 24 hours in advance'
+        return redirect(url_for('home'))
 
     query = f"""DELETE FROM purchases
                 WHERE c_email='{session['username']}' AND ticket_id={ticket_id} AND
                     airline='{airline}' AND depart_dt='{depart_dt}'"""
+
     db.execute(query)
     db.commit()
-
-    session['success'] = 'Flight successfully cancelled'
 
     return redirect(url_for('home'))
 
 @app.route('/spend-filter', methods=['POST', 'GET'])
 def spend_filter():
-    if 'name' not in session:
+    if 'name' not in session or session['role'] == 'staff':
         return redirect(url_for('login'))
 
     start = request.form['start_date']
@@ -425,12 +441,12 @@ def spend_filter():
 
     date_range = {}
     while start <= end:
-        current = f'{MONTHS[start.month]} {start.year}'
+        current = f'{MONTHS[start.month]} {start.year % 100}'
         date_range[current] = 0
         start += relativedelta(months=1)
 
     for s in spending:
-        current = f'{MONTHS[s[0].month]} {s[1].year}'
+        current = f'{MONTHS[s[0].month]} {s[1].year % 100}'
         date_range[current] = s[2]
 
     create_figure(date_range)
@@ -438,5 +454,54 @@ def spend_filter():
     session['spend-filter'] = True
     return redirect(url_for('home'))
 
+@app.route("/comment", methods=['POST', 'GET'])
+def comment():
+    if 'name' not in session:
+        return redirect(url_for('login'))
 
+    ticket_id = request.form['ticket_id']
+    airline = request.form['airline']
+    flight_id = request.form['flight_id']
+    depart_dt = request.form['depart_date'] + ' ' + request.form['depart_time'] + ':00'
+    rating = request.form['rating']
+    comment = request.form['comment']
 
+    now = datetime.now()
+    flight_dt = datetime.strptime(depart_dt, '%Y-%m-%d %H:%M:%S')
+    if now <= flight_dt:
+        error = 'Can only rate and comment on past flights!'
+        session['comment_error'] = error
+        return redirect(url_for('home'))
+
+    query = f"""SELECT *
+                FROM purchases
+                WHERE c_email='{session['username']}'
+                    AND ticket_id={ticket_id}
+                    AND airline='{airline}'
+                    AND flight_id={flight_id}
+                    AND depart_dt='{flight_dt}'"""
+    
+    results = db.execute(query).fetchall()
+    if not results:
+        error = 'Have not flown on such flight or flight does not exist'
+        session['comment_error'] = error
+        return redirect(url_for('home'))
+
+    query = f"""INSERT INTO customer_flight VALUES (
+                    '{session['username']}',
+                     {flight_id},
+                    '{depart_dt}',
+                    '{airline}',
+                     {rating},
+                    '{comment}'
+                )"""
+
+    db.execute(query)
+    db.commit()
+
+    session['comment_success'] = 'Rating & comment successfully submitted'
+    return redirect(url_for('home'))
+
+@app.route('/staff_home')
+def staff_home():
+    return render_template('staff_home.html')
