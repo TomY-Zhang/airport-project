@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+
+{% block external %}
+    <link rel = "stylesheet" href = "{{ url_for('static', filename='search.css') }}">  
+{% endblock %}
+
+{% block content %}
+    <div id='content-box'>
+        <div id='result-box'>
+            <h2>Flights</h2>
+            <table id='flight-table'>
+                <tr class='flight-row header'>
+                    <th class='flight-cell'>Airline</th>
+                    <th class='flight-cell'>Flight ID</th>
+                    <th class='flight-cell'>Departure Date</th>
+                    <th class='flight-cell'>Departure Time</th>
+                    <th class='flight-cell'>Arrival Date</th>
+                    <th class='flight-cell'>Arrival Time</th>
+                    <th class='flight-cell'>From</th>
+                    <th class='flight-cell'>To</th>
+                    <th class='flight-cell'>Price</th>
+                </tr>
+                {% for row in flights %}
+                    <tr class='flight-row'>
+                        <td class='flight-cell'>{{ row[0] }}</td>
+                        <td class='flight-cell'>{{ row[1] }}</td>
+                        <td class='flight-cell'>{{ row[2].strftime('%Y-%m-%d')  }}</td>
+                        <td class='flight-cell'>{{ row[2].strftime('%H:%M:%S') }}</td>
+                        <td class='flight-cell'>{{ row[3].strftime('%Y-%m-%d')  }}</td>
+                        <td class='flight-cell'>{{ row[3].strftime('%H:%M:%S') }}</td>
+                        <td class='flight-cell'>{{ row[4] }}</td>
+                        <td class='flight-cell'>{{ row[5] }}</td>
+                        <td class='flight-cell'>${{ row[8] }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div id='filter-box'>
+            <h2>Filter by</h2>
+            <form id='filter-form' action="/filter" method="POST">
+                {% if filter_error %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ filter_error }}
+                    </div>
+                {% endif %}
+
+                <label class='input-label'>Departure Date</label>
+                <input class='filter-input' type="date" name="depart_date" placeholder="01/31/2001"/></br>
+                <label class='input-label'>Arrival Date</label>
+                <input class='filter-input' type="date" name="arrival_date" placeholder="01/31/2001"/></br>
+                <label class='input-label'>From (0-50 chars)</label>
+                <input class='filter-input' type="text" name="src" placeholder='New York City'/></br>
+                <label class='input-label'>To (0-50 chars)</label>
+                <input class='filter-input' type="text" name="dest" placeholder='Shanghai'/></br>
+                <input class='register btn btn-outline-success' type="submit" value='Filter'/>
+            </form>
+
+            {% if name %}
+            <h2>Purchase Ticket</h2>
+            <form id="purchase-form" action="/purchase" method="POST">
+                {% if success %}
+                    <div class="alert alert-success" role="alert">
+                        {{ success }}
+                    </div>
+                {% endif %}
+
+                {% if purchase_error %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ purchase_error }}
+                    </div>
+                {% endif %}
+
+                <label class='input-label'>Airline</label>
+                <input class='purchase-input' type="text" name="airline" placeholder="Delta" required/></br>
+                <label class='input-label'>Flight ID</label>
+                <input class='purchase-input' type="number" name="flight_id" placeholder="111" required/></br>
+                <label class='input-label'>Depart Date</label>
+                <input class='purchase-input' type="date" name="depart_date" required/></br>
+                <label class='input-label'>Depart Time</label>
+                <input class='purchase-input' type="time" name="depart_time" required/></br>
+                </br>
+                <label class='input-label'>Card Type</label>
+                <select class="purchase-input" name="card_type">
+                    <option value="credit">Credit</option>
+                    <option value="debit">Debit</option>
+                </select></br>
+                <label class='input-label'>Credit Card Number:</label>
+                <input class='purchase-input' type="tel" inputmode="numeric" name="card_num" pattern="[0-9\s]{13,19}" maxlength="16" placeholder="xxxx xxxx xxxx xxxx">
+                <label class='input-label'>Holder name</label>
+                <input class='purchase-input' type="text" name="card_holder" placeholder='Joe Smith' required/></br>
+                <label class='input-label'>Expiration Date</label>
+                <input class='purchase-input' type="date" name="card_expir" required/></br>
+
+                <input class='register btn btn-outline-success' type="submit" value='Purchase'/>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

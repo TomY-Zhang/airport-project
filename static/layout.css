@@ -1,0 +1,30 @@
+#navbar {
+    height: 75px;
+    padding: 25px;
+    position: sticky;
+    text-align: center;
+    transition: 0.15s ease-out;
+    background-color: #84cf98;
+    /* border: 1px solid black; */
+}
+
+#navbar:hover {
+    background-color: #a7dbb5;
+    border: none;
+}
+
+.nav-item {
+    width: 50px;
+    text-decoration: none;
+    color: black;
+    padding: 10px;
+    font-size: 17px;
+    /* margin-left: -2.5px; */
+    margin-right: -6px;
+    transition: 0.15s ease-out;
+}
+
+.nav-item:hover {
+    background-color: white;
+    color: black;
+}

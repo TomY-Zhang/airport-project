@@ -1,0 +1,56 @@
+#welcome-box {
+    text-align: center;
+    margin-top: 40px;
+    margin-bottom: 40px;
+}
+
+.content-box {
+    margin-top: 40px;
+    text-align: center;
+}
+
+.result-box, #cancel-box {
+    display: inline-block;
+    text-align: center;
+    padding: 40px;
+}
+
+#cancel-box {
+    vertical-align: top;
+}
+
+.flight-cell {
+    padding: 16px;
+}
+
+.header {
+    border: none;
+    border-bottom: 1px solid black;
+}
+
+.input-label {
+    width: 200px;
+    text-align: left;
+    margin-left: 0px;
+}
+
+.cancel-input {
+    width: 175px;
+    margin-top: 5px;
+}
+
+.btn {
+    margin-top: 20px;
+    margin-bottom: 50px;
+}
+
+#spending-box {
+    display: inline-block;
+    vertical-align: top;
+    padding: 40px;
+}
+
+#spending-img {
+    width: 500px;
+    height: 400px;
+}

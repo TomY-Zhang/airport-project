@@ -1,0 +1,69 @@
+#login-wrapper {
+    font-size: 20px;
+    text-align: center;
+    margin-top: 2%;
+    padding: 50px;
+    /* border: 1px solid black; */
+}
+
+#login-form {
+    /* text-align: center; */
+    border: 1px solid black;
+    border-radius: 50px;
+    padding: 50px;
+}
+
+.login {
+    font-size: 15px;
+    margin: 2px;
+}
+
+#header {
+    font-size: 40px;
+}
+
+#reg-wrapper {
+    font-size: 20px;
+    text-align: center;
+    margin-top: 2%;
+    padding: 50px;
+    /* border: 1px solid black; */
+}
+
+#reg-form {
+    border: 1px solid black;
+    border-radius: 50px;
+    text-align: center;
+    padding: 50px;
+}
+
+.register {
+    font-size: 15px;
+    margin: 2px;
+    width: 180px;
+}
+
+/* .reg-div {
+    display: inline-block;
+} */
+
+.reg-label {
+    text-align: left;
+    font-size: 15px;
+    width: 230px;
+}
+
+.btn {
+    margin-top: 30px;
+}
+
+.reg-link {
+    display: block;
+    font-size: 15px;
+    color: black;
+    margin-top: 20px;
+}
+
+.reg-link:hover {
+    color: black;
+}

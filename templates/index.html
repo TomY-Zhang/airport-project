@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+
+{% block external %}
+    <link rel = "stylesheet" href = "{{ url_for('static', filename='index.css') }}">  
+{% endblock %}
+
+{% block content %}
+    {% if name %}
+    <div id="welcome-box">
+        <h1>Welcome, {{name}}.</h1>
+    </div>
+    <hr class="mt-2 mb-3"/>
+
+    <div class="content-box">
+        <div class='result-box'>
+            <h1>Your Upcoming Flights</h1><br>
+            <table id="flight-table">
+                <tr class="flight-row header">
+                    <th class='flight-cell'>Ticket ID</th>
+                    <th class='flight-cell'>Airline</th>
+                    <th class='flight-cell'>Flight ID</th>
+                    <th class='flight-cell'>Departure Date</th>
+                    <th class='flight-cell'>Departure Time</th>
+                    <th class='flight-cell'>Arrival Date</th>
+                    <th class='flight-cell'>Arrival Time</th>
+                    <th class='flight-cell'>From</th>
+                    <th class='flight-cell'>To</th>
+                    <th class='flight-cell'>Status</th>
+                </tr>
+                {% for row in flights %}
+                    <tr class='flight-row'>
+                        <td class='flight-cell'>{{ row[0] }}</td>
+                        <td class='flight-cell'>{{ row[1] }}</td>
+                        <td class='flight-cell'>{{ row[2] }}</td>
+                        <td class='flight-cell'>{{ row[3].strftime('%Y-%m-%d')  }}</td>
+                        <td class='flight-cell'>{{ row[3].strftime('%H:%M:%S') }}</td>
+                        <td class='flight-cell'>{{ row[4].strftime('%Y-%m-%d')  }}</td>
+                        <td class='flight-cell'>{{ row[4].strftime('%H:%M:%S') }}</td>
+                        <td class='flight-cell'>{{ row[5] }}</td>
+                        <td class='flight-cell'>{{ row[6] }}</td>
+                        <td class='flight-cell'>{{ row[7] }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div id="cancel-box">
+            <form id="cancel-form" action="/cancel" method="POST">
+                <h1>Cancel Flight</h1><br>
+                {% if success %}
+                    <div class="alert alert-success" role="alert">
+                        {{ success }}
+                    </div>
+                {% endif %}
+                <label class='input-label'>TicketID</label>
+                <input class='cancel-input' type="number" name="ticket_id" placeholder="1235912" required/></br>
+                <label class='input-label'>Airline</label>
+                <input class='cancel-input' type="text" name="airline" placeholder="Delta" required/></br>
+                <label class='input-label'>Flight ID</label>
+                <input class='cancel-input' type="number" name="flight_id" placeholder="111" required/></br>
+                <label class='input-label'>Depart Date</label>
+                <input class='cancel-input' type="date" name="depart_date" required/></br>
+                <label class='input-label'>Depart Time</label>
+                <input class='cancel-input' type="time" name="depart_time" required/></br>
+                <input class='register btn btn-outline-success' type="submit" value='Cancel flight'/>
+            </form>
+        </div>
+    </div>
+    <div class='content-box'>
+        <div class="result-box">
+            <h1>Your Past Flights</h1><br>
+            <table id="flight-table">
+                <tr class="flight-row header">
+                    <th class='flight-cell'>Ticket ID</th>
+                    <th class='flight-cell'>Airline</th>
+                    <th class='flight-cell'>Flight ID</th>
+                    <th class='flight-cell'>Departure Date</th>
+                    <th class='flight-cell'>Departure Time</th>
+                    <th class='flight-cell'>Arrival Date</th>
+                    <th class='flight-cell'>Arrival Time</th>
+                    <th class='flight-cell'>From</th>
+                    <th class='flight-cell'>To</th>
+                </tr>
+                {% for row in past_flights %}
+                    <tr class='flight-row'>
+                        <td class='flight-cell'>{{ row[0] }}</td>
+                        <td class='flight-cell'>{{ row[1] }}</td>
+                        <td class='flight-cell'>{{ row[2] }}</td>
+                        <td class='flight-cell'>{{ row[3].strftime('%Y-%m-%d')  }}</td>
+                        <td class='flight-cell'>{{ row[3].strftime('%H:%M:%S') }}</td>
+                        <td class='flight-cell'>{{ row[4].strftime('%Y-%m-%d')  }}</td>
+                        <td class='flight-cell'>{{ row[4].strftime('%H:%M:%S') }}</td>
+                        <td class='flight-cell'>{{ row[5] }}</td>
+                        <td class='flight-cell'>{{ row[6] }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div id="spending-box">
+            <h1>Spending</h1>
+            <img id="spending-img" src="{{ url_for('static', filename='spending_' + time + '.png') }}">
+
+            {% if spend_filter_error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ spend_filter_error }}
+                </div>
+            {% endif %}
+
+            <form id="spending-form" action="/spend-filter" method="POST">
+                <label class="input-label">From</label>
+                <input type="date" name="start_date" required></br>
+                <label class="input-label">To</label>
+                <input type="date" name="end_date"required></br>
+                <input class='register btn btn-outline-success' type="submit" value='Check'/>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+{% endblock %}

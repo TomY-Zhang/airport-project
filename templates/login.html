@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+
+{% block external %}
+    <link rel = "stylesheet" href = "{{ url_for('static', filename='logreg.css') }}">  
+{% endblock %}
+
+{% block content %}
+    <div id='login-wrapper'>
+        <form id='login-form' action="/loginAuth" method="POST">
+            <h1 id="header">Login</h1> <br>
+            {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+            {% endif %}
+            <label class='reg-label'>Username</label>
+            <input class='login' type="text" name="username" placeholder="username" required/></br>
+            <label class='reg-label'>Password</label>
+            <input class='login' type="password" name="password" placeholder="password" required/></br>
+            <input class='login btn btn-outline-success' type="submit" value=Login required/>
+        </form>
+    </div>
+{% endblock %}

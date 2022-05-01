@@ -1,0 +1,43 @@
+#content-box {
+    text-align: center;
+    margin-top: 70px;
+}
+
+#result-box, #filter-box {
+    display: inline-block;
+}
+
+.flight-cell {
+    padding: 16px;
+}
+
+.header {
+    border: none;
+    border-bottom: 1px solid black;
+}
+
+#filter-box {
+    margin-left: 50px;
+    width: 400px;
+    vertical-align: top;
+}
+
+.input-label {
+    width: 200px;
+    text-align: left;
+    margin-left: 0px;
+}
+
+.filter-input, .purchase-input {
+    width: 175px;
+    margin-top: 5px;
+}
+
+.btn {
+    margin-top: 20px;
+    margin-bottom: 50px;
+}
+
+#purchase-box {
+    padding: 30px;
+}
