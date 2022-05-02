@@ -65,8 +65,10 @@ def home():
     name = session['name'] if 'name' in session else None
 
     # Check if not logged in
-    if not name or session['role'] == 'staff':
+    if not name:
         return redirect(url_for('login'))
+    if session['role'] == 'staff':
+        return redirect(url_for('staff_home'))
 
     cancel_error = session['cancel_error'] if 'cancel_error' in session else None
     spend_filter_error = session['spend-filter-error'] if 'spend-filter-error' in session else None
@@ -120,7 +122,7 @@ def home():
 
     t = session['time']
     session.pop('time')
-    return render_template('index.html', name=name, flights=flights, past_flights=past_flights, \
+    return render_template('index.html', name=name, role=session['role'], flights=flights, past_flights=past_flights, \
         cancel_error=cancel_error, time=str(t), spend_filter_error=spend_filter_error, \
         comment_error=comment_error, comment_success=comment_success)
 
@@ -133,13 +135,19 @@ def login():
 @app.route('/register')
 def register():
     if 'name' in session:
-        return redirect(url_for('home'))
+        if session['role'] == 'customer':
+            return redirect(url_for('home'))
+        else:
+            return redirect(url_for('staff_home'))
     return render_template('register.html', name=None);
 
 @app.route('/staffRegister')
 def staff_register():
     if 'name' in session:
-        return redirect(url_for('home'))
+        if session['role'] == 'customer':
+            return redirect(url_for('home'))
+        else:
+            return redirect(url_for('staff_home'))
     return render_template('staff_register.html')
 
 @app.route('/loginAuth', methods=['GET', 'POST'])
@@ -164,10 +172,11 @@ def loginAuth():
         session['name'] = name
         session['role'] = 'customer'
     elif staff:
-        *_, fname, lname, dob = staff[0]
+        *_, airline, fname, lname, dob = staff[0]
         session['username'] = username
         session['name'] = f'{fname} {lname}'
         session['role'] = 'staff'
+        session['airline'] = airline
     else:
         # Invalid login
         error = 'Invalid login credentials'
@@ -293,14 +302,26 @@ def staffRegisterAuth():
 
 @app.route('/logout')
 def logout():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+
     # Delete session
-    session.pop('username')
     session.pop('name')
+    session.pop('username')
+
+    if session['role'] == 'staff':
+        session.pop('airline')
     session.pop('role')
+
     return redirect(url_for('login'))
 
 @app.route('/search')
 def search():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] == 'staff':
+        return redirect(url_for('staff_home'))
+
     name = session['name'] if 'name' in session else None
     purchase_error = session['purchase error'] if 'purchase error' in session else None
     success = session['success'] if 'success' in session else None
@@ -347,8 +368,10 @@ def filter():
 
 @app.route('/purchase', methods=['GET', 'POST'])
 def purchase():
-    if 'name' not in session or session['role'] == 'staff':
-        return redirect(url_for('search'))
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] == 'staff':
+        return redirect(url_for('staff_home'))
 
     # Get all future flights
     query = "SELECT * FROM flight WHERE depart_dt >= NOW()"
@@ -386,8 +409,10 @@ def purchase():
 
 @app.route('/cancel', methods=['POST', 'GET'])
 def cancel():
-    if 'name' not in session or session['role'] == 'staff':
+    if 'name' not in session:
         return redirect(url_for('login'))
+    if session['role'] == 'staff':
+        return redirect(url_for('staff_home'))
 
     ticket_id = request.form['ticket_id']
     airline = request.form['airline']
@@ -412,8 +437,10 @@ def cancel():
 
 @app.route('/spend-filter', methods=['POST', 'GET'])
 def spend_filter():
-    if 'name' not in session or session['role'] == 'staff':
+    if 'name' not in session:
         return redirect(url_for('login'))
+    if session['role'] == 'staff':
+        return redirect(url_for('staff_home'))
 
     start = request.form['start_date']
     end = request.form['end_date']
@@ -458,6 +485,8 @@ def spend_filter():
 def comment():
     if 'name' not in session:
         return redirect(url_for('login'))
+    if session['role'] == 'staff':
+        return redirect(url_for('staff_home'))
 
     ticket_id = request.form['ticket_id']
     airline = request.form['airline']
@@ -504,4 +533,194 @@ def comment():
 
 @app.route('/staff_home')
 def staff_home():
-    return render_template('staff_home.html')
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    create_error = session['create_error'] if 'create_error' in session else None
+    change_error = session['change_error'] if 'change_error' in session else None
+    add_error = session['add_error'] if 'add_error' in session else None
+
+    if create_error:
+        session.pop('create_error')
+    if change_error:
+        session.pop('change_error')
+    if add_error:
+        session.pop('add_error')
+
+    if 'flights' in session:
+        flights = session['flights']
+        session.pop('flights')
+    else:
+        query = f"""SELECT * FROM flight WHERE airline='{session['airline']}'
+                    AND depart_dt > NOW() AND depart_dt <= NOW() + INTERVAL '30 days' """
+        flights = db.execute(query).fetchall()
+
+    query = f"""SELECT email, name, ticket_id, flight_id, depart_dt
+                FROM purchases as P, customer as C
+                WHERE P.c_email=C.email AND airline='{session['airline']}'
+                ORDER BY email ASC"""
+    customers = db.execute(query).fetchall()
+
+    return render_template('staff_home.html', name=session['name'], role=session['role'], default=True, \
+        airline=session['airline'], flights=flights, customers=customers, create_error=create_error,\
+        change_error=change_error, add_error=add_error)
+
+@app.route('/staff-filter', methods=['GET', 'POST'])
+def staff_filter():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    start_date = request.form['start_date']
+    end_date = request.form['end_date']
+    src = request.form['src']
+    dest = request.form['dest']
+
+    query = f"""SELECT *
+                FROM flight
+                WHERE airline='{session['airline']}' """
+
+    if start_date != '':
+        query += f"AND CAST(depart_dt as DATE) >= '{start_date}' "
+
+    if end_date != '':
+        query += f"AND CAST(arrival_dt as DATE) <= '{end_date}' "
+
+    if src != '':
+        # Get airport codes for source city
+        data = db.execute(f"SELECT * FROM airport WHERE city='{src}' ")
+        src_codes = [row[0] for row in data]
+        src_codes = "('" + "', '".join(src_codes) + "')"
+
+        query += f"AND src_airport_code IN {src_codes} "
+    if dest != '':
+        # Get airport codes for destination city
+        data = db.execute(f"SELECT * FROM airport WHERE city='{dest}' ")
+        dest_codes = [row[0] for row in data]
+        dest_codes = "('" + "', '".join(dest_codes) + "')"   
+
+        query += f"AND dest_airport_code IN {dest_codes} "
+    
+    flights = db.execute(query).fetchall()
+    
+    flight_ids = '(' + ','.join([str(row[1]) for row in flights]) + ')'
+    customers = []
+    if flight_ids != '()':
+        query = f"""SELECT email, name, ticket_id, flight_id, depart_dt
+                    FROM purchases as P, customer as C
+                    WHERE P.c_email=C.email AND flight_id IN {flight_ids}
+                    ORDER BY email ASC"""
+        customers = db.execute(query).fetchall()
+
+    return render_template('staff_home.html', name=session['name'], role=session['role'],\
+        airline=session['airline'], flights=flights, customers=customers)
+
+@app.route('/staff-create-flight', methods=['GET', 'POST'])
+def staff_create_flight():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    airline = session['airline']
+    flight_id = request.form['flight_id']
+    depart_dt = request.form['depart_date'] + ' ' + request.form['depart_time'] + ':00'
+
+    query = f"""SELECT *
+                FROM flight
+                WHERE airline='{airline}' AND id={flight_id} AND depart_dt='{depart_dt}'"""
+    flights = db.execute(query).fetchall()
+
+    if flights:
+        session['create_error'] = f'Flight with ID {flight_id} already exists'
+        return redirect(url_for('staff_home'))
+
+    plane_id = request.form['plane_id']
+    query = f"""SELECT * FROM airplane WHERE id={plane_id} AND airline='{airline}'"""
+    planes = db.execute(query).fetchall()
+
+    if not planes:
+        session['create_error'] = 'Plane does not exist or does not belong to ' + airline
+        return redirect(url_for('staff_home'))
+
+    arrival_dt = request.form['arrival_date'] + ' ' + request.form['arrival_time'] + ':00'
+    if depart_dt >= arrival_dt:
+        session['create_error'] = 'Invalid departure and arrival datetimes'
+        return redirect(url_for('staff_home'))
+
+    src = request.form['src']
+    dest = request.form['dest'] 
+    status = request.form['status']
+    base_price = request.form['base_price']
+
+    query = f"""INSERT INTO flight VALUES(
+                    '{airline}', {flight_id}, '{depart_dt}', '{arrival_dt}', '{src}', '{dest}',\
+                    {plane_id}, '{status}', {base_price}
+                )"""
+    db.execute(query)
+    db.commit()
+
+    return redirect(url_for('staff_home'))
+
+@app.route('/staff-change-status', methods=['GET', 'POST'])
+def staff_change_status():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    airline = session['airline']
+    flight_id = request.form['flight_id']
+    depart_dt = request.form['depart_date'] + ' ' + request.form['depart_time'] + ':00'
+
+    query = f"""SELECT *
+                FROM flight
+                WHERE airline='{airline}' AND id={flight_id} AND depart_dt='{depart_dt}'"""
+    flights = db.execute(query).fetchall()
+
+    if not flights:
+        session['change_error'] = 'Flight does not exist'
+        return redirect(url_for('staff_home'))
+
+    status = request.form['status']
+
+    query = f"""UPDATE flight
+                SET status='{status}'
+                WHERE airline='{airline}' AND id={flight_id} AND depart_dt='{depart_dt}'"""
+
+    db.execute(query)
+    db.commit()
+
+    return redirect(url_for('staff_home'))
+
+@app.route('/staff-add-plane', methods=['GET', 'POST'])
+def staff_add_plane():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    # Check if plane_id already exists
+    plane_id = request.form['plane_id']
+    query = f'SELECT * FROM airplane WHERE id={plane_id}'
+    planes = db.execute(query).fetchall()
+    if planes:
+        session['add_error'] = f'Plane with ID {plane_id} already exists'
+        return redirect(url_for('home'))
+
+    airline = session['airline']
+    num_seats = request.form['num_seats']
+    manufacturer = request.form['manufacturer']
+    age = request.form['age']
+
+    query = f"""INSERT INTO airplane VALUES (
+                    '{airline}', {plane_id}, {num_seats}, '{manufacturer}', {age}
+                )"""
+    db.execute(query)
+    db.commit()
+
+    return redirect(url_for('home'))
+

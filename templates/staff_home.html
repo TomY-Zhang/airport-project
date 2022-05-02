@@ -1,0 +1,183 @@
+{% extends 'layout.html' %}
+
+{% block external %}
+    <link rel = "stylesheet" href = "{{ url_for('static', filename='staff_home.css') }}">
+{% endblock %}
+
+{% block content %}
+    <div id="welcome-box">
+        <h1>Welcome, {{ name }}.</h1>
+    </div>
+    <hr class="mt-2 mb-3"/>
+
+    <div id='content-box'>
+        <div id="left-box">
+            <div id="table-box">
+                <h2>
+                    Upcoming <i>{{ airline }}</i> flights
+                    {% if default %}
+                        in the next 30 days
+                    {% endif %}
+                </h2>
+                <table class='table'>
+                    <tr class='flight-row header'>
+                        <!-- <th class='flight-cell'>Airline</th> -->
+                        <th class='flight-cell'>Flight ID</th>
+                        <th class='flight-cell'>Departure Date</th>
+                        <th class='flight-cell'>Departure Time</th>
+                        <th class='flight-cell'>Arrival Date</th>
+                        <th class='flight-cell'>Arrival Time</th>
+                        <th class='flight-cell'>From</th>
+                        <th class='flight-cell'>To</th>
+                        <th class='flight-cell'>Plane ID</th>
+                        <th class='flight-cell'>Status</th>
+                        <th class='flight-cell'>Price</th>
+                    </tr>
+                    {% for row in flights %}
+                        <tr class='flight-row'>
+                            <!-- <td class='flight-cell'>{{ row[0] }}</td> -->
+                            <td class='flight-cell'>{{ row[1] }}</td>
+                            <td class='flight-cell'>{{ row[2].strftime('%Y-%m-%d')  }}</td>
+                            <td class='flight-cell'>{{ row[2].strftime('%H:%M') }}</td>
+                            <td class='flight-cell'>{{ row[3].strftime('%Y-%m-%d')  }}</td>
+                            <td class='flight-cell'>{{ row[3].strftime('%H:%M') }}</td>
+                            <td class='flight-cell'>{{ row[4] }}</td>
+                            <td class='flight-cell'>{{ row[5] }}</td>
+                            <td class='flight-cell'>{{ row[6] }}</td>
+                            <td class='flight-cell'>{{ row[7] }}</td>
+                            <td class='flight-cell'>${{ row[8] }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <div id="table-box">
+                <h2>Customers</h2>
+                <table class='table'>
+                    <tr class='flight-row header'>
+                        <th class='flight-cell'>Email</th>
+                        <th class='flight-cell'>Name</th>
+                        <th class='flight-cell'>Ticket ID</th>
+                        <th class='flight-cell'>Flight ID</th>
+                        <!-- <th class='flight-cell'>Depart Date</th> -->
+                        <!-- <th class='flight-cell'>Depart Time</th> -->
+                    </tr>
+                    {% for row in customers %}
+                        <tr class='flight-row'>
+                            <td class='flight-cell'>{{ row[0] }}</td>
+                            <td class='flight-cell'>{{ row[1] }}</td>
+                            <td class='flight-cell'>{{ row[2] }}</td>
+                            <td class='flight-cell'>{{ row[3] }}</td>
+                            <!-- <td class='flight-cell'>{{ row[4].strftime('%Y-%m-%d')  }}</td> -->
+                            <!-- <td class='flight-cell'>{{ row[4].strftime('%H:%M') }}</td> -->
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+        <div id="right-box">
+            <div class="manage-box">
+                <h2>Filter flights</h2><br>
+                <form id='filter-form' action="/staff-filter" method="POST">
+                    {% if filter_error %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ filter_error }}
+                        </div>
+                    {% endif %}
+                    
+                    <label>Flights between <input type="date" name="start_date"> and <input type="date" name="end_date"> </label><br>
+                    <label class='input-label'>From (0-50 chars)</label>
+                    <input class='input' type="text" name="src" placeholder='New York City'/></br>
+                    <label class='input-label'>To (0-50 chars)</label>
+                    <input class='input' type="text" name="dest" placeholder='Shanghai'/></br>
+                    <input class='register btn btn-outline-success' type="submit" value='Filter'/>
+                </form>
+            </div>
+            <div class="manage-box">
+                <h2>Create new flight</h2><br>
+                <form id='create-flight-form' action="/staff-create-flight" method="POST">
+                    {% if create_error %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ create_error }}
+                        </div>
+                    {% endif %}
+                    
+                    <label class='input-label'>Flight ID</label>
+                    <input class='input' type="number" name="flight_id" min="0" max="9999999999" placeholder='0123456789' required/></br>
+                    <label class='input-label'>Plane ID</label>
+                    <input class='input' type="number" name="plane_id" min="0" max="99999" placeholder='01234' required/></br>
+                    <label class='input-label'>Flight Status</label>
+                    <select class="input" name="status" required>
+                        <option value="delayed">Delayed</option>
+                        <option value="on time">On time</option>
+                        <option value="canceled">Canceled</option>
+                    </select><br>
+                    <label class='input-label'>Base price</label>
+                    <input class='input' type="number" step='0.01' name="base_price" min='0' max="99999.99" placeholder='100.00' required/></br><br>
+                    
+                    <label class='input-label'>Departure Date</label>
+                    <input class='input' type="date" name="depart_date" placeholder="01/31/2001" required/></br>
+                    <label class='input-label'>Departure Time</label>
+                    <input class='input' type="time" name="depart_time" required/></br>
+                    <label class='input-label'>Arrival Date</label>
+                    <input class='input' type="date" name="arrival_date" placeholder="01/31/2001" required/></br>
+                    <label class='input-label'>Departure Time</label>
+                    <input class='input' type="time" name="arrival_time" required/><br><br>
+
+                    <label class='input-label'>Source airport code</label>
+                    <input class='input' name='src' type='text' maxlength='3' placeholder='ABC' required><br>
+                    <label class='input-label'>Destination airport code</label>
+                    <input class='input' name='dest' type='text' maxlength='3' placeholder='ABC' required><br>
+
+                    <input class='register btn btn-outline-success' type="submit" value='Create'/>
+                </form>
+            </div>
+            <div class="manage-box">
+                <h2>Change flight status</h2><br>
+                <form id='status-form' action='/staff-change-status' method='POST'>
+                    {% if change_error %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ change_error }}
+                        </div>
+                    {% endif %}
+
+                    <label class='input-label'>Flight ID</label>
+                    <input class='input' type="number" name="flight_id" min="0" max="9999999999" placeholder='0123456789' required/></br>
+
+                    <label class='input-label'>Departure Date</label>
+                    <input class='input' type="date" name="depart_date" placeholder="01/31/2001" required/></br>
+                    <label class='input-label'>Departure Time</label>
+                    <input class='input' type="time" name="depart_time" required/></br>
+
+                    <label class='input-label'>Flight Status</label>
+                    <select class="input" name="status" required>
+                        <option value="delayed">Delayed</option>
+                        <option value="on time">On time</option>
+                        <option value="canceled">Canceled</option>
+                    </select><br>
+
+                    <input class='register btn btn-outline-success' type="submit" value='Change'/>
+                </form>
+            </div>
+            <div class="manage-box">
+                <h2>Add airplane</h2><br>
+                <form id='add-plane-form' action='staff-add-plane' method='POST'>
+                    {% if add_error %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ add_error }}
+                        </div>
+                    {% endif %}
+
+                    <label class='input-label'>Plane ID</label>
+                    <input class='input' type="number" name="plane_id" min="0" max="99999" placeholder='01234' required/></br>
+                    <label class='input-label'># of seats</label>
+                    <input class='input' name='num_seats' type='number' min="0" max="99999" placeholder='123' required><br>
+                    <label class='input-label'>Manufacturer</label>
+                    <input class='input' name='manufacturer' type='text' maxlength='50' placeholder='Boeing' required><br>
+                    <label class='input-label'>Age</label>
+                    <input class='input' name='age' type='number' min="0" max="99999" placeholder='5' required><br>
+                    <input class='register btn btn-outline-success' type="submit" value='Add'/>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

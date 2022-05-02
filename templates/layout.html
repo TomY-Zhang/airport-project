@@ -10,9 +10,17 @@
     <body>
         <div id='navbar'>
             {% if name %}
-                <a class='nav-item' href='/'>Home</a>
+                {% if role == 'customer' %}
+                    <a class='nav-item' href='/'>Home</a>
+                {% else %}
+                    <a class='nav-item' href='/staff_home'>Home</a>
+                {% endif %}
             {% endif %}
-            <a class='nav-item' href='/search'>Search</a>
+
+            {% if name and role == 'customer' %}
+                <a class='nav-item' href='/search'>Search</a>
+            {% endif %}
+            
             {% if not name %}
                 <a class='nav-item' href="/login">Login</a>
                 <a class='nav-item' href="/register">Register</a>
