@@ -14,18 +14,21 @@
                     <a class='nav-item' href='/'>Home</a>
                 {% else %}
                     <a class='nav-item' href='/staff_home'>Home</a>
+                    <a class='nav-item' href='/staff_view'>View</a>
                 {% endif %}
             {% endif %}
 
-            {% if name and role == 'customer' %}
+            {% if not role or role != 'staff' %}
                 <a class='nav-item' href='/search'>Search</a>
             {% endif %}
-            
+
+            {% if name %}
+                <a class='nav-item' href="/logout">Logout</a>
+            {% endif %}
+
             {% if not name %}
                 <a class='nav-item' href="/login">Login</a>
                 <a class='nav-item' href="/register">Register</a>
-            {% else %}
-                <a class='nav-item' href="/logout">Logout</a>
             {% endif %}
         </div>
         {% block content%}{% endblock%}

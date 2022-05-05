@@ -1,0 +1,162 @@
+{% extends 'layout.html' %}
+
+{% block external %}
+    <link rel = "stylesheet" href = "{{ url_for('static', filename='staff_view.css') }}">
+{% endblock %}
+
+{% block content %}
+    <div id="content-box">
+        <div id="left-box">
+            {% if customer_flights %}
+                <div class="table-box">
+                    <h2>Flights flown by customer</h2>
+                    <table>
+                        <tr class='flight-row header'>
+                            <th class='flight-cell'>Flight ID</th>
+                            <th class='flight-cell'>Departure Date</th>
+                            <th class='flight-cell'>Departure Time</th>
+                        </tr>
+                        {% for row in customer_flights %}
+                            <tr class='flight-row'>
+                                <td class='flight-cell'>{{ row[0] }}</td>
+                                <td class='flight-cell'>{{ row[1].strftime('%Y-%m-%d')  }}</td>
+                                <td class='flight-cell'>{{ row[1].strftime('%H:%M') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            {% endif %}
+            <div class='table-box'>
+                <h2>Flights</h2>
+                <table>
+                    <tr class='flight-row header'>
+                        <th class='flight-cell'>Flight ID</th>
+                        <th class='flight-cell'>Departure Date</th>
+                        <th class='flight-cell'>Departure Time</th>
+                        <th class='flight-cell'>Arrival Date</th>
+                        <th class='flight-cell'>Arrival Time</th>
+                        <th class='flight-cell'>From</th>
+                        <th class='flight-cell'>To</th>
+                        <th class='flight-cell'>Average Rating</th>
+                    </tr>
+                    {% for row in flights %}
+                        <tr class='flight-row'>
+                            <td class='flight-cell'>{{ row[0] }}</td>
+                            <td class='flight-cell'>{{ row[1].strftime('%Y-%m-%d')  }}</td>
+                            <td class='flight-cell'>{{ row[1].strftime('%H:%M') }}</td>
+                            <td class='flight-cell'>{{ row[2].strftime('%Y-%m-%d')  }}</td>
+                            <td class='flight-cell'>{{ row[2].strftime('%H:%M') }}</td>
+                            <td class='flight-cell'>{{ row[3] }}</td>
+                            <td class='flight-cell'>{{ row[4] }}</td>
+                            <td class='flight-cell'>{{ row[5] }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <div class="table-box">
+                <h2>Comments</h2>
+                <table>
+                    <tr class='flight-row header'>
+                        <th class='flight-cell'>Customer Email</th>
+                        <th class='flight-cell'>Flight ID</th>
+                        <th class='flight-cell'>Departure Date</th>
+                        <th class='flight-cell'>Departure Time</th>
+                        <th class='flight-cell'>Rating</th>
+                        <th class='flight-cell'>Comment</th>
+                    </tr>
+                    {% for row in comments %}
+                        <tr class='flight-row'>
+                            <td class='flight-cell'>{{ row[0] }}</td>
+                            <td class='flight-cell'>{{ row[1] }}</td>
+                            <td class='flight-cell'>{{ row[2].strftime('%Y-%m-%d')  }}</td>
+                            <td class='flight-cell'>{{ row[2].strftime('%H:%M') }}</td>
+                            <td class='flight-cell'>{{ row[4] }}</td>
+                            <td class='flight-cell'>{{ row[5] }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+        <div id="right-box">
+            <div class="stat-box">
+                <h2>Find Customer Flights</h2>
+                <form action='/staff-customer-flight' method="POST">
+                    <label class='input-label'>Customer Email</label>
+                    <input class='input' type="text" name="email" maxlength="50" placeholder='joesmith@example.com' required/></br>
+                    <input class='register btn btn-outline-success' type="submit" value='Find'/>
+                </form>
+            </div>
+            <div class="stat-box">
+                <h2>Tickets Sold</h2><br>
+                
+                {% if time %}
+                    <img id="spending-img" src="{{ url_for('static', filename='sales_' + time + '.png') }}">
+                {% endif %}
+                {% if ticket_filter_error %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ ticket_filter_error }}
+                    </div>
+                {% endif %}
+                <form action="staff-ticket-filter" method="POST">
+                    Between
+                    <input type="date" name="start" required>
+                    and
+                    <input type="date" name="end" required><br>
+                    <input class='register btn btn-outline-success' type="submit" value='Filter'/>
+                </form>
+            </div>
+            <div class="stat-box">
+                <h2>Most Frequent Customer</h2>
+                {% if frequent %}
+                    <p>{{ frequent[0] }}, {{ frequent[1].title() }}</p>
+                {% endif %}
+            </div>
+            <div class="stat-box">
+                <h2>Revenue Earned</h2>
+                <table>
+                    <tr class='flight-row header'>
+                        <th class='flight-cell'></th>
+                        <th class='flight-cell'>Sales</th>
+                    </tr>
+                        <tr class='flight-row'>
+                            <td class='flight-cell'>Last month</td>
+                            <td class='flight-cell'>${{ sales_month }}</td>
+                        </tr>
+                        <tr class='flight-row'>
+                            <td class='flight-cell'>Last year</td>
+                            <td class='flight-cell'>${{ sales_year }}</td>
+                        </tr>
+                        <tr class='flight-row'>
+                            <td class='flight-cell'>First class</td>
+                            <td class='flight-cell'>${{ sales_class[0] }}</td>
+                        </tr>
+                        <tr class='flight-row'>
+                            <td class='flight-cell'>Business class</td>
+                            <td class='flight-cell'>${{ sales_class[1] }}</td>
+                        </tr>
+                        <tr class='flight-row'>
+                            <td class='flight-cell'>Economy class</td>
+                            <td class='flight-cell'>${{ sales_class[2] }}</td>
+                        </tr>
+                </table>
+            </div>
+            <div class="stat-box">
+                <h2>Top 3 Destinations</h2>
+                <table>
+                    <tr class='flight-row header'>
+                        <th class='flight-cell'>Time range</th>
+                        <th class='flight-cell'>Destinations</th>
+                    </tr>
+                    <tr class='flight-row'>
+                        <td class='flight-cell'>Last 3 months</td>
+                        <td class='flight-cell'>{{ month_codes }}</td>
+                    </tr>
+                    <tr class='flight-row'>
+                        <td class='flight-cell'>Last year</td>
+                        <td class='flight-cell'>{{ year_codes }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

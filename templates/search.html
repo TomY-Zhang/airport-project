@@ -8,6 +8,11 @@
     <div id='content-box'>
         <div id='result-box'>
             <h2>Flights</h2>
+            {% if purchase_error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ purchase_error }}
+                </div>
+            {% endif %}
             <table id='flight-table'>
                 <tr class='flight-row header'>
                     <th class='flight-cell'>Airline</th>
@@ -19,6 +24,12 @@
                     <th class='flight-cell'>From</th>
                     <th class='flight-cell'>To</th>
                     <th class='flight-cell'>Price</th>
+                    {% if name %}
+                        <th class='flight-cell'>Card Type</th>
+                        <th class='flight-cell'>Card #</th>
+                        <th class='flight-cell'>Holder Name</th>
+                        <th class='flight-cell'>Expiration Date</th>
+                    {% endif %}
                 </tr>
                 {% for row in flights %}
                     <tr class='flight-row'>
@@ -31,6 +42,19 @@
                         <td class='flight-cell'>{{ row[4] }}</td>
                         <td class='flight-cell'>{{ row[5] }}</td>
                         <td class='flight-cell'>${{ row[8] }}</td>
+                        {% if name %}
+                        <form action="/purchase" method="POST">
+                            <input type="hidden" name="row" value="{{ row[0] }};{{ row[1] }};{{ row[2] }}">
+                            <td><select class="table-input" name="card_type">
+                                <option value="credit">Credit</option>
+                                <option value="debit">Debit</option>
+                            </select></td>
+                            <td><input class='table-input' type="tel" inputmode="numeric" name="card_num" pattern="[0-9\s]{13,19}" maxlength="16" placeholder="xxxx xxxx xxxx xxxx"></td>
+                            <td><input class='table-input' type="text" name="card_holder" placeholder='Joe Smith' required/></td>
+                            <td><input class='table-input' type="date" name="card_expir" required/></td>
+                            <td><input class='table-input btn btn-outline-primary' type="submit" value='Purchase'/></td>
+                        </form>
+                        {% endif %}
                     </tr>
                 {% endfor %}
             </table>
@@ -55,7 +79,7 @@
                 <input class='register btn btn-outline-success' type="submit" value='Filter'/>
             </form>
 
-            {% if name %}
+            <!-- {% if name %}
             <h2>Purchase Ticket</h2>
             <form id="purchase-form" action="/purchase" method="POST">
                 {% if success %}
@@ -93,7 +117,7 @@
 
                 <input class='register btn btn-outline-success' type="submit" value='Purchase'/>
             </form>
-            {% endif %}
+            {% endif %} -->
         </div>
     </div>
 {% endblock %}

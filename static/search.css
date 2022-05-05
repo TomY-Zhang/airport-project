@@ -1,6 +1,6 @@
 #content-box {
     text-align: center;
-    margin-top: 70px;
+    margin-top: 30px;
 }
 
 #result-box, #filter-box {
@@ -40,4 +40,15 @@
 
 #purchase-box {
     padding: 30px;
+}
+
+.table-input {
+    vertical-align: top;
+    height: 40px;
+    margin: 0px;
+    margin-right: 5px;
+}
+
+tr {
+    vertical-align: middle;
 }

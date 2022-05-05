@@ -54,3 +54,14 @@
     margin-top: -10px;
     margin-bottom: 20px;
 }
+
+.table-input {
+    vertical-align: top;
+    height: 40px;
+    margin: 0px;
+    margin-right: 5px;
+}
+
+tr {
+    vertical-align: middle;
+}

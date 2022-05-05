@@ -40,6 +40,12 @@
                             <td class='flight-cell'>{{ row[5] }}</td>
                             <td class='flight-cell'>{{ row[6] }}</td>
                             <td class='flight-cell'>{{ row[7] }}</td>
+                            <td class='flight-cell'>
+                                <form action='/cancel' method="POST">
+                                    <input type="hidden" name="row" value="{{ row[0] }},{{ row[1] }},{{ row[2] }}, {{ row[3] }}">
+                                    <input class='table-input btn btn-outline-primary' type="submit" value='Cancel flight'/>
+                                </form>
+                            </td>
                         </tr>
                     {% endfor %}
                 </table>
@@ -75,7 +81,7 @@
             </div>
         </div>
         <div id='right-box'>
-            <div class="manage-box">
+            <!-- <div class="manage-box">
                 <form id="cancel-form" action="/cancel" method="POST">
                     <h1>Cancel Flight</h1><br>
                     {% if cancel_error %}
@@ -95,11 +101,12 @@
                     <input class='input' type="time" name="depart_time" required/></br>
                     <input class='register btn btn-outline-success' type="submit" value='Cancel flight'/>
                 </form>
-            </div>
+            </div> -->
             <div class="manage-box">
                 <h1>Spending</h1>
-                <img id="spending-img" src="{{ url_for('static', filename='spending_' + time + '.png') }}">
-
+                {% if time %}
+                    <img id="spending-img" src="{{ url_for('static', filename='spending_' + time + '.png') }}">
+                {% endif %}
                 {% if spend_filter_error %}
                     <div class="alert alert-danger" role="alert">
                         {{ spend_filter_error }}

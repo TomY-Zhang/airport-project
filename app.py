@@ -1,5 +1,4 @@
 import os
-import requests
 from flask import Flask, render_template, redirect, request, session, url_for
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -14,13 +13,11 @@ import time
 
 engine = create_engine(os.getenv("DATABASE"))
 db = scoped_session(sessionmaker(bind=engine))
-session
 
 if not os.getenv("DATABASE"):
     raise RuntimeError("DATABASE is not set")
 
 app = Flask(__name__)
-app.config["CACHE_TYPE"] = "null"
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
 MONTHS = {
@@ -38,19 +35,19 @@ MONTHS = {
     12 : 'Dec'
 }
 
-def create_figure(spending):
-    objects = spending.keys()
+def create_figure(stats, name, y_name):
+    objects = stats.keys()
     y_pos = np.arange(len(objects))
-    plt.bar(y_pos, spending.values(), align='center', alpha=0.5)
+    plt.bar(y_pos, stats.values(), align='center', alpha=0.5)
     plt.xticks(y_pos, objects)
     plt.xlabel('Month')
-    plt.ylabel('$ spent')
+    plt.ylabel(y_name)
 
     session['time'] = time.time()
-    plot_name = "spending_" + str(session['time']) + ".png"
+    plot_name = name + "_" + str(session['time']) + ".png"
 
     for filename in os.listdir('static/'):
-        if filename.startswith('spending_'):  # not to remove other images
+        if filename.startswith(name + '_'):  # not to remove other images
             os.remove('static/' + filename)
 
     plt.savefig('static/' + plot_name)
@@ -58,7 +55,13 @@ def create_figure(spending):
 
 @app.errorhandler(404)
 def page_not_found(e):
+    name = session['name'] if 'name' in session else None
     return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    name = session['name'] if 'name' in session else None
+    return render_template('404.html', name=name), 500
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -70,13 +73,10 @@ def home():
     if session['role'] == 'staff':
         return redirect(url_for('staff_home'))
 
-    cancel_error = session['cancel_error'] if 'cancel_error' in session else None
     spend_filter_error = session['spend-filter-error'] if 'spend-filter-error' in session else None
     comment_error = session['comment_error'] if 'comment_error' in session else None
     comment_success = session['comment_success'] if 'comment_success' in session else None
 
-    if cancel_error:
-        session.pop('cancel_error')
     if spend_filter_error:
         session.pop('spend-filter-error')
     if comment_error:
@@ -118,12 +118,12 @@ def home():
             current = f'{MONTHS[s[0].month]} {s[1].year % 100}'
             date_range[current] = s[2]
 
-        create_figure(date_range)
+        create_figure(date_range, 'spending', '$ spent')
 
     t = session['time']
     session.pop('time')
     return render_template('index.html', name=name, role=session['role'], flights=flights, past_flights=past_flights, \
-        cancel_error=cancel_error, time=str(t), spend_filter_error=spend_filter_error, \
+        time=str(t), spend_filter_error=spend_filter_error, \
         comment_error=comment_error, comment_success=comment_success)
 
 @app.route('/login')
@@ -153,30 +153,31 @@ def staff_register():
 @app.route('/loginAuth', methods=['GET', 'POST'])
 def loginAuth():
     # Get credentials
-    username = request.form['username']
+    username = request.form['username'].lower()
     password = request.form['password']
 
     password = md5(password.encode('utf-8')).hexdigest()
 
     # Check if user is customer
-    query = f"SELECT * FROM customer WHERE email='{username}' AND password='{password}'"
+    query = f"SELECT * FROM customer WHERE LOWER(email)='{username}' AND password='{password}'"
     customer = db.execute(query).fetchall()
 
     # Check if user is staff
-    query = f"SELECT * FROM staff WHERE username='{username}' AND password='{password}'"
+    query = f"SELECT * FROM staff WHERE LOWER(username)='{username}' AND password='{password}'"
     staff = db.execute(query).fetchall()
 
     if customer:
         username, password, name, *_ = customer[0]
-        session['username'] = username
-        session['name'] = name
+        session['username'] = username.lower()
+        session['name'] = name.title()
         session['role'] = 'customer'
     elif staff:
-        *_, airline, fname, lname, dob = staff[0]
-        session['username'] = username
-        session['name'] = f'{fname} {lname}'
+        *_, airline, fname, lname, _ = staff[0]
+        session['username'] = username.lower()
+        session['name'] = f'{fname} {lname}'.title()
+        print(session['name'])
         session['role'] = 'staff'
-        session['airline'] = airline
+        session['airline'] = airline.lower()
     else:
         # Invalid login
         error = 'Invalid login credentials'
@@ -202,10 +203,13 @@ def registerAuth():
     }
 
     for key in forms:
-        forms[key] = request.form[key]
+        val = request.form[key]
+        if (type(val) == str):
+            val = val.lower()
+        forms[key] = val
 
     # Check if email already registered in system
-    query = f"SELECT * FROM customer WHERE email='{forms['email']}'"
+    query = f"SELECT * FROM customer WHERE LOWER(email)='{forms['email']}'"
     data = db.execute(query).fetchall()
 
     if data:
@@ -223,7 +227,7 @@ def registerAuth():
             db.commit()
 
             # Create session
-            session['username'] = forms['email']
+            session['username'] = forms['email'].lower()
             session['name'] = forms['name']
             session['role'] = 'customer'
 
@@ -247,9 +251,12 @@ def staffRegisterAuth():
     }
 
     for key in forms:
-        forms[key] = request.form[key]
+        val = request.form[key]
+        if (type(val) == str):
+            val = val.lower()
+        forms[key] = val
     
-    query = f"SELECT * FROM staff WHERE username='{forms['username']}'"
+    query = f"SELECT * FROM staff WHERE LOWER(username)='{forms['username']}'"
     data = db.execute(query).fetchall()
 
     if data:
@@ -262,7 +269,7 @@ def staffRegisterAuth():
             return render_template('staff_register.html', error=error)
 
         # Check if airline exists
-        query = f"SELECT * FROM airline WHERE name='{forms['airline']}'"
+        query = f"SELECT * FROM airline WHERE LOWER(name)='{forms['airline']}'"
         data = db.execute(query).fetchall()
 
         if not data:
@@ -290,7 +297,7 @@ def staffRegisterAuth():
                 db.commit()
 
             # Create session
-            session['username'] = forms['username']
+            session['username'] = forms['username'].lower()
             session['name'] = f"{forms['fname']} {forms['lname']}"
             session['role'] = 'staff'
 
@@ -317,12 +324,11 @@ def logout():
 
 @app.route('/search')
 def search():
-    if 'name' not in session:
-        return redirect(url_for('login'))
-    if session['role'] == 'staff':
+    if 'name' in session and session['role'] == 'staff':
         return redirect(url_for('staff_home'))
 
     name = session['name'] if 'name' in session else None
+    role = session['role'] if 'role' in session else None
     purchase_error = session['purchase error'] if 'purchase error' in session else None
     success = session['success'] if 'success' in session else None
     
@@ -335,14 +341,14 @@ def search():
     query = "SELECT * FROM flight WHERE depart_dt >= NOW()"
     flights = db.execute(query)
 
-    return render_template('search.html', flights=flights, name=name, purchase_error=purchase_error, success=success)
+    return render_template('search.html', role=role, flights=flights, name=name, purchase_error=purchase_error, success=success)
 
 @app.route('/filter', methods=['GET', 'POST'])
 def filter():
     depart_date = request.form['depart_date']
     arrival_date = request.form['arrival_date']
-    src = request.form['src']
-    dest = request.form['dest']
+    src = request.form['src'].lower()
+    dest = request.form['dest'].lower()
 
     # Build query based on filters entered
     query = "SELECT * FROM flight WHERE depart_dt >= NOW() "
@@ -352,13 +358,13 @@ def filter():
         query += f"AND CAST(arrival_dt as DATE) = '{arrival_date}%' "
     if src != '':
         # Get airport codes for source city
-        data = db.execute(f"SELECT * FROM airport WHERE city='{src}' ")
+        data = db.execute(f"SELECT * FROM airport WHERE LOWER(city)='{src}' ")
         src_codes = [row[0] for row in data]
         src_codes = "('" + "', '".join(src_codes) + "')"
         query += f"AND src_airport_code IN {src_codes} "
     if dest != '':
         # Get airport codes for destination city
-        data = db.execute(f"SELECT * FROM airport WHERE city='{dest}' ")
+        data = db.execute(f"SELECT * FROM airport WHERE LOWER(city)='{dest}' ")
         dest_codes = [row[0] for row in data]
         dest_codes = "('" + "', '".join(dest_codes) + "')"   
         query += f"AND dest_airport_code IN {dest_codes} "
@@ -377,27 +383,29 @@ def purchase():
     query = "SELECT * FROM flight WHERE depart_dt >= NOW()"
     upcoming_flights = db.execute(query)
 
-    names = ['airline', 'flight_id', 'depart_date', 'depart_time', \
-             'card_type', 'card_num', 'card_holder', 'card_expir']
-    forms = {}
-    for name in names:
-        forms[name] = request.form[name]
+    row = request.form['row'].split(';')
+    [airline, flight_id, depart_dt] = row
 
-    query = f"""SELECT * FROM ticket WHERE airline='{forms['airline']}' AND
-                flight_id={forms['flight_id']} AND
-                depart_dt='{forms['depart_date'] + ' ' + forms['depart_time'] + ':00'}'"""
+    card_type = request.form['card_type']
+    card_num = request.form['card_num']
+    card_holder = request.form['card_holder']
+    card_expir = request.form['card_expir']
+
+    query = f"""SELECT * FROM ticket WHERE LOWER(airline)='{airline}' AND
+                flight_id={flight_id} AND
+                depart_dt='{depart_dt}'"""
     tickets = db.execute(query).fetchall()
 
     if not tickets:
-        session['purchase error'] = 'Flight does not exist or is fully booked'
+        session['purchase error'] = 'Flight is fully booked'
         return redirect(url_for('search'))
     else:
         try:
-            query = f"""INSERT INTO purchases VALUES(\
+            query = f"""INSERT INTO purchases VALUES( \
                         '{session['username']}', {tickets[0][0]},
-                         {tickets[0][3]}, '{forms['depart_date'] + ' ' + forms['depart_time'] + ':00'}',
-                        '{forms['airline']}', NOW(), '{forms['card_type']}', {forms['card_num']},
-                        '{forms['card_holder']}', '{forms['card_expir']}')"""
+                         {tickets[0][3]}, '{depart_dt}',
+                        '{airline}', NOW(), '{card_type}', {card_num},
+                        '{card_holder}', '{card_expir}')"""
             db.execute(query)
             db.commit()
 
@@ -414,21 +422,12 @@ def cancel():
     if session['role'] == 'staff':
         return redirect(url_for('staff_home'))
 
-    ticket_id = request.form['ticket_id']
-    airline = request.form['airline']
-    flight_id = request.form['flight_id']
-    depart_dt = request.form['depart_date'] + ' ' + request.form['depart_time'] + ':00'
-    
-    now = datetime.now()
-    flight_dt = datetime.strptime(depart_dt, '%Y-%m-%d %H:%M:%S')
-
-    if now > flight_dt - relativedelta(days=1):
-        session['cancel_error'] = 'Cannot cancel flight less than 24 hours in advance'
-        return redirect(url_for('home'))
+    row = request.form['row'].split(',')
+    [ticket_id, airline, flight_id, depart_dt] = row
 
     query = f"""DELETE FROM purchases
                 WHERE c_email='{session['username']}' AND ticket_id={ticket_id} AND
-                    airline='{airline}' AND depart_dt='{depart_dt}'"""
+                    airline='{airline}' AND flight_id={flight_id} AND depart_dt='{depart_dt}'"""
 
     db.execute(query)
     db.commit()
@@ -453,7 +452,7 @@ def spend_filter():
                     DATE_TRUNC('year', P.purchase_dt) as year,
                     sum(T.sold_price) as money_spent
                 FROM purchases as P NATURAL JOIN ticket as T
-                WHERE P.c_email='{session['username']}' 
+                WHERE LOWER(P.c_email)='{session['username']}' 
                     AND CAST(P.purchase_dt as DATE) >= '{start}'
                     AND CAST(P.purchase_dt as DATE) <= '{end}'
                     AND T.id = P.ticket_id
@@ -476,7 +475,7 @@ def spend_filter():
         current = f'{MONTHS[s[0].month]} {s[1].year % 100}'
         date_range[current] = s[2]
 
-    create_figure(date_range)
+    create_figure(date_range, 'spending', '$ spent')
 
     session['spend-filter'] = True
     return redirect(url_for('home'))
@@ -540,32 +539,36 @@ def staff_home():
 
     create_error = session['create_error'] if 'create_error' in session else None
     change_error = session['change_error'] if 'change_error' in session else None
-    add_error = session['add_error'] if 'add_error' in session else None
+    add_plane_error = session['add_plane_error'] if 'add_plane_error' in session else None
 
     if create_error:
         session.pop('create_error')
     if change_error:
         session.pop('change_error')
-    if add_error:
-        session.pop('add_error')
+    if add_plane_error:
+        session.pop('add_plane_error')
 
     if 'flights' in session:
         flights = session['flights']
         session.pop('flights')
     else:
-        query = f"""SELECT * FROM flight WHERE airline='{session['airline']}'
-                    AND depart_dt > NOW() AND depart_dt <= NOW() + INTERVAL '30 days' """
+        query = f"""SELECT * FROM flight WHERE LOWER(airline)='{session['airline']}'
+                    AND depart_dt > NOW() AND depart_dt <= NOW() + INTERVAL '30 days'
+                    ORDER BY id ASC"""
         flights = db.execute(query).fetchall()
 
     query = f"""SELECT email, name, ticket_id, flight_id, depart_dt
                 FROM purchases as P, customer as C
-                WHERE P.c_email=C.email AND airline='{session['airline']}'
+                WHERE P.c_email=C.email AND LOWER(airline)='{session['airline']}'
                 ORDER BY email ASC"""
     customers = db.execute(query).fetchall()
 
+    query = f"""SELECT * FROM airplane WHERE LOWER(airline)='{session['airline']}'"""
+    planes = db.execute(query)
+
     return render_template('staff_home.html', name=session['name'], role=session['role'], default=True, \
-        airline=session['airline'], flights=flights, customers=customers, create_error=create_error,\
-        change_error=change_error, add_error=add_error)
+        airline=session['airline'].title(), flights=flights, customers=customers, planes=planes, \
+        create_error=create_error, change_error=change_error, add_plane_error=add_plane_error)
 
 @app.route('/staff-filter', methods=['GET', 'POST'])
 def staff_filter():
@@ -576,12 +579,12 @@ def staff_filter():
 
     start_date = request.form['start_date']
     end_date = request.form['end_date']
-    src = request.form['src']
-    dest = request.form['dest']
+    src = request.form['src'].lower()
+    dest = request.form['dest'].lower()
 
     query = f"""SELECT *
                 FROM flight
-                WHERE airline='{session['airline']}' """
+                WHERE LOWER(airline)='{session['airline']}' """
 
     if start_date != '':
         query += f"AND CAST(depart_dt as DATE) >= '{start_date}' "
@@ -591,14 +594,14 @@ def staff_filter():
 
     if src != '':
         # Get airport codes for source city
-        data = db.execute(f"SELECT * FROM airport WHERE city='{src}' ")
+        data = db.execute(f"SELECT * FROM airport WHERE LOWER(city)='{src}' ")
         src_codes = [row[0] for row in data]
         src_codes = "('" + "', '".join(src_codes) + "')"
 
         query += f"AND src_airport_code IN {src_codes} "
     if dest != '':
         # Get airport codes for destination city
-        data = db.execute(f"SELECT * FROM airport WHERE city='{dest}' ")
+        data = db.execute(f"SELECT * FROM airport WHERE LOWER(city)='{dest}' ")
         dest_codes = [row[0] for row in data]
         dest_codes = "('" + "', '".join(dest_codes) + "')"   
 
@@ -611,12 +614,12 @@ def staff_filter():
     if flight_ids != '()':
         query = f"""SELECT email, name, ticket_id, flight_id, depart_dt
                     FROM purchases as P, customer as C
-                    WHERE P.c_email=C.email AND flight_id IN {flight_ids}
+                    WHERE LOWER(P.c_email)=LOWER(C.email) AND flight_id IN {flight_ids}
                     ORDER BY email ASC"""
         customers = db.execute(query).fetchall()
 
     return render_template('staff_home.html', name=session['name'], role=session['role'],\
-        airline=session['airline'], flights=flights, customers=customers)
+        airline=session['airline'].title(), flights=flights, customers=customers)
 
 @app.route('/staff-create-flight', methods=['GET', 'POST'])
 def staff_create_flight():
@@ -651,8 +654,8 @@ def staff_create_flight():
         session['create_error'] = 'Invalid departure and arrival datetimes'
         return redirect(url_for('staff_home'))
 
-    src = request.form['src']
-    dest = request.form['dest'] 
+    src = request.form['src'].upper()
+    dest = request.form['dest'].upper()
     status = request.form['status']
     base_price = request.form['base_price']
 
@@ -672,25 +675,18 @@ def staff_change_status():
     if session['role'] != 'staff':
         return redirect(url_for('home'))
 
-    airline = session['airline']
-    flight_id = request.form['flight_id']
-    depart_dt = request.form['depart_date'] + ' ' + request.form['depart_time'] + ':00'
-
-    query = f"""SELECT *
-                FROM flight
-                WHERE airline='{airline}' AND id={flight_id} AND depart_dt='{depart_dt}'"""
-    flights = db.execute(query).fetchall()
-
-    if not flights:
-        session['change_error'] = 'Flight does not exist'
-        return redirect(url_for('staff_home'))
-
+    row = request.form['row'].split(';')
     status = request.form['status']
+
+    [airline, flight_id, depart_dt] = row
 
     query = f"""UPDATE flight
                 SET status='{status}'
-                WHERE airline='{airline}' AND id={flight_id} AND depart_dt='{depart_dt}'"""
+                WHERE LOWER(airline)='{airline}'
+                    AND depart_dt='{depart_dt}'
+                    AND id={flight_id}"""
 
+    # db.execute(query, (status, airline, depart_dt, int(flight_id)))
     db.execute(query)
     db.commit()
 
@@ -705,15 +701,15 @@ def staff_add_plane():
 
     # Check if plane_id already exists
     plane_id = request.form['plane_id']
-    query = f'SELECT * FROM airplane WHERE id={plane_id}'
+    query = f"SELECT * FROM airplane WHERE id={plane_id} AND LOWER(airline)='{session['airline']}'"
     planes = db.execute(query).fetchall()
     if planes:
-        session['add_error'] = f'Plane with ID {plane_id} already exists'
+        session['add_plane_error'] = f'Plane with ID {plane_id} already exists'
         return redirect(url_for('home'))
 
     airline = session['airline']
     num_seats = request.form['num_seats']
-    manufacturer = request.form['manufacturer']
+    manufacturer = request.form['manufacturer'].lower()
     age = request.form['age']
 
     query = f"""INSERT INTO airplane VALUES (
@@ -722,5 +718,256 @@ def staff_add_plane():
     db.execute(query)
     db.commit()
 
-    return redirect(url_for('home'))
+    return redirect(url_for('staff_home'))
 
+@app.route('/staff-add-airport', methods=['GET', 'POST'])
+def staff_add_airport():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    code = request.form['code']
+    name = request.form['name'].lower()
+    city = request.form['city'].lower()
+    country = request.form['country'].lower()
+    airport_type = request.form['type']
+
+    query = f"""INSERT INTO airport VALUES (
+                    '{code}', '{name}', '{city}', '{country}', '{airport_type}'
+                )"""
+    db.execute(query)
+    db.commit()
+
+    return redirect(url_for('staff_home'))
+
+@app.route('/staff_view')
+def staff_view():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    ticket_filter_error = session['ticket-filter-error'] if 'ticket-filter-error' in session else None
+    t = str(session['time']) if 'time' in session else None
+    if ticket_filter_error:
+        session.pop('ticket-filter-error')
+    if t:
+        session.pop('time')
+    
+    # Get all flights
+    query = f"""SELECT F.id, F.depart_dt, F.arrival_dt, F.src_airport_code, F.dest_airport_code, AVG(rating)
+                FROM flight as F NATURAL JOIN customer_flight as CF
+                WHERE F.id=CF.flight_id AND LOWER(F.airline)='{session['airline']}'
+                GROUP BY F.id, F.depart_dt, F.arrival_dt, F.src_airport_code, F.dest_airport_code"""
+    flights = db.execute(query)
+
+    query = f"""SELECT * FROM customer_flight WHERE LOWER(airline)='{session['airline']}'"""
+    comments = db.execute(query)
+
+    query = f"""SELECT c_email, name
+                FROM purchases, customer
+                WHERE c_email=email AND LOWER(airline)='{session['airline']}'
+                GROUP BY c_email, name
+                HAVING COUNT(flight_id) >= ALL(
+                    SELECT COUNT(flight_id)
+                    FROM purchases
+                    WHERE LOWER(airline)='{session['airline']}'
+                    GROUP BY c_email
+                )"""
+    frequent = db.execute(query).fetchall()[0]
+
+    # get revenue from past month
+    query = f"""SELECT sum(sold_price)
+                FROM purchases NATURAL JOIN ticket
+                WHERE ticket_id=id 
+                    AND LOWER(airline) = '{session['airline']}'
+                    AND purchase_dt >= NOW() - INTERVAL '1 month'"""
+    
+    sales_month = db.execute(query).fetchall()[0][0]
+    if not sales_month:
+        sales_month = 0
+
+    # get revenu from past yera
+    query = f"""SELECT sum(sold_price)
+                FROM purchases NATURAL JOIN ticket
+                WHERE ticket_id=id 
+                    AND LOWER(airline) = '{session['airline']}'
+                    AND purchase_dt >= NOW() - INTERVAL '1 year'"""
+    sales_year = db.execute(query).fetchall()[0][0]
+    if not sales_year:
+        sales_year = 0
+
+    # get revenue by travel class
+    sales_class = []
+    classes = ['first', 'business', 'economy']
+    for c in classes:
+        query = f"""SELECT sum(sold_price)
+                    FROM purchases NATURAL JOIN ticket
+                    WHERE ticket_id=id 
+                        AND LOWER(airline) = '{session['airline']}'
+                        AND class='{c}'"""
+        data = db.execute(query).fetchall()[0][0]
+        if not data:
+            data = 0
+        sales_class.append(data)
+
+    # get top 3 most popular destinations in last year
+    query = f"""SELECT F.dest_airport_code, COUNT(P.ticket_id)
+                FROM purchases as P NATURAL JOIN flight as F
+                WHERE P.flight_id=F.id
+                    AND P.depart_dt >= NOW() - INTERVAL '3 months'
+                    AND LOWER(airline) = '{session['airline']}'
+                GROUP BY F.dest_airport_code
+                ORDER BY COUNT(P.ticket_id) DESC
+                LIMIT 3 """
+    codes = db.execute(query).fetchall()
+    month_codes = ''
+    if codes:
+        month_codes = ', '.join([row[0] for row in codes])
+
+    # get top 3 most popular destinations in last 3 months
+    query = f"""SELECT F.dest_airport_code, COUNT(P.ticket_id)
+                FROM purchases as P NATURAL JOIN flight as F
+                WHERE P.flight_id=F.id
+                    AND P.depart_dt >= NOW() - INTERVAL '1 year'
+                    AND LOWER(airline) = '{session['airline']}'
+                GROUP BY F.dest_airport_code
+                ORDER BY COUNT(P.ticket_id) DESC
+                LIMIT 3 """
+    codes = db.execute(query).fetchall()
+    year_codes = ''
+    if codes:
+        year_codes = ', '.join([row[0] for row in codes])
+
+    return render_template('staff_view.html', name=session['name'], role=session['role'], \
+        flights=flights, comments=comments, frequent=frequent, ticket_filter_error=ticket_filter_error, \
+        time=t, sales_month=sales_month, sales_year=sales_year, sales_class=sales_class, \
+        month_codes=month_codes, year_codes=year_codes)
+
+@app.route('/staff-customer-flight', methods=['POST', 'GET'])
+def staff_customer_flights():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    ticket_filter_error = session['ticket-filter-error'] if 'ticket-filter-error' in session else None
+    t = str(session['time']) if 'time' in session else None
+    if ticket_filter_error:
+        session.pop('ticket-filter-error')
+    if t:
+        session.pop('time')
+    
+    # Get all flights
+    query = f"""SELECT F.id, F.depart_dt, F.arrival_dt, F.src_airport_code, F.dest_airport_code, AVG(rating)
+                FROM flight as F NATURAL JOIN customer_flight as CF
+                WHERE F.id=CF.flight_id AND LOWER(F.airline)='{session['airline']}'
+                GROUP BY F.id, F.depart_dt, F.arrival_dt, F.src_airport_code, F.dest_airport_code"""
+    flights = db.execute(query)
+
+    query = f"""SELECT * FROM customer_flight WHERE LOWER(airline)='{session['airline']}'"""
+    comments = db.execute(query)
+
+    query = f"""SELECT c_email, name
+                FROM purchases, customer
+                WHERE c_email=email AND LOWER(airline)='{session['airline']}'
+                GROUP BY c_email, name
+                HAVING COUNT(flight_id) >= ALL(
+                    SELECT COUNT(flight_id)
+                    FROM purchases
+                    WHERE LOWER(airline)='{session['airline']}'
+                    GROUP BY c_email
+                )"""
+    frequent = db.execute(query).fetchall()[0]
+
+    # get revenue from past month
+    query = f"""SELECT sum(sold_price)
+                FROM purchases NATURAL JOIN ticket
+                WHERE ticket_id=id 
+                    AND LOWER(airline) = '{session['airline']}'
+                    AND purchase_dt >= NOW() - INTERVAL '1 month'"""
+    
+    sales_month = db.execute(query).fetchall()[0][0]
+    if not sales_month:
+        sales_month = 0
+
+    # get revenu from past yera
+    query = f"""SELECT sum(sold_price)
+                FROM purchases NATURAL JOIN ticket
+                WHERE ticket_id=id 
+                    AND LOWER(airline) = '{session['airline']}'
+                    AND purchase_dt >= NOW() - INTERVAL '1 year'"""
+    sales_year = db.execute(query).fetchall()[0][0]
+    if not sales_year:
+        sales_year = 0
+
+    # get revenue by travel class
+    sales_class = []
+    classes = ['first', 'business', 'economy']
+    for c in classes:
+        query = f"""SELECT sum(sold_price)
+                    FROM purchases NATURAL JOIN ticket
+                    WHERE ticket_id=id 
+                        AND LOWER(airline) = '{session['airline']}'
+                        AND class='{c}'"""
+        data = db.execute(query).fetchall()[0][0]
+        if not data:
+            data = 0
+        sales_class.append(data)
+
+    # get top 3 most popular destinations in last 3 months
+    query = f"""SELECT """
+
+    # Get list of flights based on customer email
+    email = request.form['email'].lower()
+    query = f"""SELECT flight_id, depart_dt 
+                FROM purchases 
+                WHERE LOWER(c_email)='{email}' AND depart_dt < NOW() """
+    customer_flights = db.execute(query)
+
+    return render_template('staff_view.html', name=session['name'], role=session['role'], \
+        flights=flights, comments=comments, frequent=frequent, customer_flights=customer_flights,
+        ticket_filter_error=ticket_filter_error, time=t, sales_month=sales_month, sales_year=sales_year, \
+        sales_class=sales_class)
+
+@app.route('/staff-ticket-filter', methods=['GET', 'POST'])
+def staff_ticket_filter():
+    if 'name' not in session:
+        return redirect(url_for('login'))
+    if session['role'] != 'staff':
+        return redirect(url_for('home'))
+
+    start = request.form['start']
+    end = request.form['end']
+
+    start = datetime.strptime(start, '%Y-%m-%d')
+    end = datetime.strptime(end, '%Y-%m-%d')
+
+    if start > end:
+        session['ticket-filter-error'] = 'Invalid date range'
+        return redirect(url_for('staff_view'))
+
+    query = f"""SELECT DATE_TRUNC('month', P.purchase_dt) as month,
+                    DATE_TRUNC('year', P.purchase_dt) as year,
+                    COUNT(P.purchase_dt)
+                FROM purchases as P NATURAL JOIN ticket as T
+                WHERE LOWER(airline) = '{session['airline']}'
+                    AND CAST(P.purchase_dt as DATE) >= '{start}'
+                    AND CAST(P.purchase_dt as DATE) <= '{end}'
+                    AND T.id = P.ticket_id
+                GROUP BY month, year"""
+    tickets = db.execute(query).fetchall()
+
+    date_range = {}
+    while start <= end:
+        current = f'{MONTHS[start.month]} {start.year % 100}'
+        date_range[current] = 0
+        start += relativedelta(months=1)
+
+    for t in tickets:
+        current = f'{MONTHS[t[0].month]} {t[1].year % 100}'
+        date_range[current] = t[2]
+
+    create_figure(date_range, 'sales', 'Tickets sold')
+    return redirect(url_for('staff_view'))
