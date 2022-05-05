@@ -10,6 +10,7 @@ import numpy as np
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 import time
+from random import randint
 
 engine = create_engine(os.getenv("DATABASE"))
 db = scoped_session(sessionmaker(bind=engine))
@@ -175,7 +176,6 @@ def loginAuth():
         *_, airline, fname, lname, _ = staff[0]
         session['username'] = username.lower()
         session['name'] = f'{fname} {lname}'.title()
-        print(session['name'])
         session['role'] = 'staff'
         session['airline'] = airline.lower()
     else:
@@ -209,10 +209,12 @@ def registerAuth():
         forms[key] = val
 
     # Check if email already registered in system
-    query = f"SELECT * FROM customer WHERE LOWER(email)='{forms['email']}'"
-    data = db.execute(query).fetchall()
+    query = f"SELECT * FROM customer WHERE LOWER(email)='{forms['username']}'"
+    data_customer = db.execute(query).fetchall()
+    query = f"SELECT * FROM staff WHERE LOWER(username)='{forms['username']}'"
+    data_staff = db.execute(query).fetchall()
 
-    if data:
+    if data_customer or data_staff:
         error = 'Email already registered'
         return render_template('register.html', error=error)
     else:
@@ -228,7 +230,7 @@ def registerAuth():
 
             # Create session
             session['username'] = forms['email'].lower()
-            session['name'] = forms['name']
+            session['name'] = forms['name'].title()
             session['role'] = 'customer'
 
             return redirect(url_for('home'))
@@ -256,10 +258,12 @@ def staffRegisterAuth():
             val = val.lower()
         forms[key] = val
     
+    query = f"SELECT * FROM customer WHERE LOWER(email)='{forms['username']}'"
+    data_customer = db.execute(query).fetchall()
     query = f"SELECT * FROM staff WHERE LOWER(username)='{forms['username']}'"
-    data = db.execute(query).fetchall()
+    data_staff = db.execute(query).fetchall()
 
-    if data:
+    if data_customer or data_staff:
         error = 'Username already taken'
         return render_template('staff_register.html', error=error)
     else:
@@ -298,8 +302,9 @@ def staffRegisterAuth():
 
             # Create session
             session['username'] = forms['username'].lower()
-            session['name'] = f"{forms['fname']} {forms['lname']}"
+            session['name'] = f"{forms['fname']} {forms['lname']}".title()
             session['role'] = 'staff'
+            session['airline'] = forms['airline']
 
             return redirect(url_for('home'))
 
@@ -355,7 +360,7 @@ def filter():
     if depart_date != '':
         query += f"AND CAST(depart_dt as DATE) = '{depart_date}' "
     if arrival_date != '':
-        query += f"AND CAST(arrival_dt as DATE) = '{arrival_date}%' "
+        query += f"AND CAST(arrival_dt as DATE) = '{arrival_date}' "
     if src != '':
         # Get airport codes for source city
         data = db.execute(f"SELECT * FROM airport WHERE LOWER(city)='{src}' ")
@@ -391,9 +396,14 @@ def purchase():
     card_holder = request.form['card_holder']
     card_expir = request.form['card_expir']
 
-    query = f"""SELECT * FROM ticket WHERE LOWER(airline)='{airline}' AND
-                flight_id={flight_id} AND
-                depart_dt='{depart_dt}'"""
+    query = f"""SELECT * FROM ticket as T
+                WHERE LOWER(T.airline)='{airline}'
+                    AND T.flight_id={flight_id}
+                    AND T.depart_dt='{depart_dt}'
+                    AND NOT EXISTS (
+                        SELECT * FROM purchases WHERE ticket_id=T.id
+                    )
+                """
     tickets = db.execute(query).fetchall()
 
     if not tickets:
@@ -488,7 +498,7 @@ def comment():
         return redirect(url_for('staff_home'))
 
     ticket_id = request.form['ticket_id']
-    airline = request.form['airline']
+    airline = request.form['airline'].lower()
     flight_id = request.form['flight_id']
     depart_dt = request.form['depart_date'] + ' ' + request.form['depart_time'] + ':00'
     rating = request.form['rating']
@@ -505,10 +515,10 @@ def comment():
                 FROM purchases
                 WHERE c_email='{session['username']}'
                     AND ticket_id={ticket_id}
-                    AND airline='{airline}'
+                    AND LOWER(airline)='{airline}'
                     AND flight_id={flight_id}
                     AND depart_dt='{flight_dt}'"""
-    
+
     results = db.execute(query).fetchall()
     if not results:
         error = 'Have not flown on such flight or flight does not exist'
@@ -540,6 +550,7 @@ def staff_home():
     create_error = session['create_error'] if 'create_error' in session else None
     change_error = session['change_error'] if 'change_error' in session else None
     add_plane_error = session['add_plane_error'] if 'add_plane_error' in session else None
+    add_airport_error = session['add_airport_error'] if 'add_airport_error' in session else None
 
     if create_error:
         session.pop('create_error')
@@ -547,6 +558,8 @@ def staff_home():
         session.pop('change_error')
     if add_plane_error:
         session.pop('add_plane_error')
+    if add_airport_error:
+        session.pop('add_airport_error')
 
     if 'flights' in session:
         flights = session['flights']
@@ -554,7 +567,7 @@ def staff_home():
     else:
         query = f"""SELECT * FROM flight WHERE LOWER(airline)='{session['airline']}'
                     AND depart_dt > NOW() AND depart_dt <= NOW() + INTERVAL '30 days'
-                    ORDER BY id ASC"""
+                    ORDER BY depart_dt ASC"""
         flights = db.execute(query).fetchall()
 
     query = f"""SELECT email, name, ticket_id, flight_id, depart_dt
@@ -563,12 +576,14 @@ def staff_home():
                 ORDER BY email ASC"""
     customers = db.execute(query).fetchall()
 
-    query = f"""SELECT * FROM airplane WHERE LOWER(airline)='{session['airline']}'"""
+    query = f"""SELECT * FROM airplane WHERE LOWER(airline)='{session['airline']}'
+                ORDER BY id ASC"""
     planes = db.execute(query)
 
     return render_template('staff_home.html', name=session['name'], role=session['role'], default=True, \
         airline=session['airline'].title(), flights=flights, customers=customers, planes=planes, \
-        create_error=create_error, change_error=change_error, add_plane_error=add_plane_error)
+        create_error=create_error, change_error=change_error, add_plane_error=add_plane_error, \
+        add_airport_error=add_airport_error)
 
 @app.route('/staff-filter', methods=['GET', 'POST'])
 def staff_filter():
@@ -618,8 +633,11 @@ def staff_filter():
                     ORDER BY email ASC"""
         customers = db.execute(query).fetchall()
 
+    query = f"""SELECT * FROM airplane WHERE LOWER(airline)='{session['airline']}'"""
+    planes = db.execute(query)
+
     return render_template('staff_home.html', name=session['name'], role=session['role'],\
-        airline=session['airline'].title(), flights=flights, customers=customers)
+        airline=session['airline'].title(), flights=flights, customers=customers, planes=planes)
 
 @app.route('/staff-create-flight', methods=['GET', 'POST'])
 def staff_create_flight():
@@ -657,7 +675,7 @@ def staff_create_flight():
     src = request.form['src'].upper()
     dest = request.form['dest'].upper()
     status = request.form['status']
-    base_price = request.form['base_price']
+    base_price = int(request.form['base_price'])
 
     query = f"""INSERT INTO flight VALUES(
                     '{airline}', {flight_id}, '{depart_dt}', '{arrival_dt}', '{src}', '{dest}',\
@@ -665,6 +683,25 @@ def staff_create_flight():
                 )"""
     db.execute(query)
     db.commit()
+    
+    classes = ['first', 'business', 'economy']
+    prices = [200, 100, 0]
+    i = 0
+    while i < 10:
+        ticket_id = randint(1, 9999999999)
+        j = randint(0,2)
+        flight_class = classes[j]
+        price = prices[j] + base_price
+        try:
+            query = f"""INSERT INTO ticket VALUES (
+                            {ticket_id}, '{flight_class}', {price}, {flight_id},
+                            '{depart_dt}', '{airline}'
+                        )"""
+            db.execute(query)
+            db.commit()
+            i += 1
+        except Exception as e:
+            print(e)
 
     return redirect(url_for('staff_home'))
 
@@ -727,11 +764,17 @@ def staff_add_airport():
     if session['role'] != 'staff':
         return redirect(url_for('home'))
 
-    code = request.form['code']
+    code = request.form['code'].upper()
     name = request.form['name'].lower()
     city = request.form['city'].lower()
     country = request.form['country'].lower()
     airport_type = request.form['type']
+
+    query = f"""SELECT * FROM airport WHERE code='{code}'"""
+    airport = db.execute(query).fetchall()
+    if airport:
+        session['add_airport_error'] = f'Airport with code {code} already exists'
+        return redirect(url_for('staff_home'))
 
     query = f"""INSERT INTO airport VALUES (
                     '{code}', '{name}', '{city}', '{country}', '{airport_type}'
@@ -775,7 +818,9 @@ def staff_view():
                     WHERE LOWER(airline)='{session['airline']}'
                     GROUP BY c_email
                 )"""
-    frequent = db.execute(query).fetchall()[0]
+    frequent = db.execute(query).fetchall()
+    print(frequent)
+    frequent = frequent[0]
 
     # get revenue from past month
     query = f"""SELECT sum(sold_price)
@@ -788,7 +833,7 @@ def staff_view():
     if not sales_month:
         sales_month = 0
 
-    # get revenu from past yera
+    # get revenu from past year
     query = f"""SELECT sum(sold_price)
                 FROM purchases NATURAL JOIN ticket
                 WHERE ticket_id=id 
@@ -812,7 +857,7 @@ def staff_view():
             data = 0
         sales_class.append(data)
 
-    # get top 3 most popular destinations in last year
+    # get top 3 most popular destinations in the past 3 months
     query = f"""SELECT F.dest_airport_code, COUNT(P.ticket_id)
                 FROM purchases as P NATURAL JOIN flight as F
                 WHERE P.flight_id=F.id
@@ -826,7 +871,7 @@ def staff_view():
     if codes:
         month_codes = ', '.join([row[0] for row in codes])
 
-    # get top 3 most popular destinations in last 3 months
+    # get top 3 most popular destinations in the past year
     query = f"""SELECT F.dest_airport_code, COUNT(P.ticket_id)
                 FROM purchases as P NATURAL JOIN flight as F
                 WHERE P.flight_id=F.id
@@ -923,7 +968,9 @@ def staff_customer_flights():
     email = request.form['email'].lower()
     query = f"""SELECT flight_id, depart_dt 
                 FROM purchases 
-                WHERE LOWER(c_email)='{email}' AND depart_dt < NOW() """
+                WHERE LOWER(c_email)='{email}'
+                    AND depart_dt >= NOW()
+                    AND LOWER(airline)='{session['airline']}'"""
     customer_flights = db.execute(query)
 
     return render_template('staff_view.html', name=session['name'], role=session['role'], \
