@@ -5,7 +5,7 @@
 - Python server that routes clients, renders templates, & interacts with the PostgreSQL database (all the backend stuff)
 - creates sessions, manages error handling, and upholds privelege levels (i.e. customer cannot access staff pages)
 
-→ **templates**
+**templates**
 
 → *404.html*
 
@@ -48,7 +48,7 @@
 
 - allows staff to view flight ratings and comments, revenue earned, top destinations, most frequent customer, tickets sold, and a list of flights a customer has been on
 
-→ **static**
+**static**
 
 → *layout.css*
 
