@@ -1,10 +1,4 @@
-## Team Members / Contributions
-
-Tom Zhang
-
-- Did everything 👍
-
-## Files
+# Files
 
 → *app.py*
 
