@@ -3,7 +3,7 @@
 → *app.py*
 
 - Python server that routes clients, renders templates, & interacts with the PostgreSQL database (all the backend stuff)
-- creates sessions, manages error handling, and upholds privelege levels (i.e. customer cannot access staff pages)
+- creates sessions, manages error handling, and upholds privilege levels (i.e. customer cannot access staff pages)
 
 **templates**
 
